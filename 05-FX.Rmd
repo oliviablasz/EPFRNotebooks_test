@@ -1,0 +1,119 @@
+# FX Strategy
+
+```{r, include=F}
+rm(list = ls())
+library('EPFR')
+library(RCurl)
+library("knitr")
+library("kableExtra")
+library("dplyr")
+library("readr")
+library("tidyr")
+library("forcats")
+library(reshape2)
+library(DT)
+```
+
+The main focus of this proof of concept is to understand the methodology behind the _FX Strategy_. 
+
+---
+
+## Overview
+    
+<!-- * EPFR have developed a new currency trading strategy. -->
+<!-- * This approach uses the stated allocations of equity funds with a cross border focus. -->
+<!-- * The strategy developed by EPFR Global is based on percentage flow into currencies. -->
+<!-- * Daily percentage flow is compounded over a trailing twenty day period. -->
+<!-- * The top fifth of ACWI currencies, in terms of twenty day percentage flows, outperforms the bottom fifth by over 5% per year. -->
+<!-- * The strategy does well, particularly when picking amongst G10 currencies. -->
+
+This strategy, in particular, is a currency rotation strategy, where it chooses different equity markets of countries across the globe. This approach uses the stated allocations of equity funds with a cross-border focus and calculates percentage flow into currencies. In terms of twenty-day percentage flows, the top fifth of ACWI currencies outperform the bottom fifth by over 5% per year. The strategy works well everywhere but better amongst G10 currencies.
+
+---
+
+## Daily Percentage Flow
+    
+The _FX Strategy_ developed by EPFR Global is based on percentage flow into currencies. In this section, the reader will understand what types of aggregations can be used to create a signal for this strategy as well as the methodology behind daily percentage flow calculations. Understanding these fundamentals will further supplement a user's experience working with these data sets as they continue exploring for value and underlying meaning.
+
+---
+
+### Aggregations
+    
+The first step is defining a subset of data to capture in calculating our signal. We use equity funds with a cross-border focus for this strategy.
+
+* Cross-boarder focus: includes global funds, regional funds, Europe regional investing in different countries in Europe, essentially any fund that has a mandate that spans more than one country. 
+
+We exclude the single country-mandated fund flows from this analysis.
+
+The following requirement is that the subset of **funds must all be reporting daily flows and country allocations** since these values are needed to calculate Daily Percentage Flow.
+
+The figure below shows EPFR's coverage over time, which is reported at the end of July each year. As seen below, cross-border funds, which report their country allocations and their fund flows, are a subset of those that only report their fund flows to EPFR.
+
+```{r, echo=FALSE}
+knitr::include_graphics("/Users/blaszkowskio/Dropbox/Quantitative Research/Concept/New Model Concept/Strategy Notebooks/png/coverage_ctryequity.png")
+```
+
+Users looking for more specific detail can customize this aggregation even further using EPFR's fund-level or share class-level granularity. Some good examples would be Active/Passive, ETF or Mutual funds, Institituinal or Retail. Users can use these tags to different degrees in creating aggregated signals to backtest. 
+
+This can be achieved using fund-level flow files or reaching out to EPFR's quant team for customized aggregations.
+
+---
+
+### Calculation
+
+To begin calculating the Daily Percentage flow, we start with our subset of cross-border equity funds. To calculate the fund's impact on a currency, we scale a fund's flow by multiplying it against its stated country allocation to countries using that currency, which is available in EPFR's Country Allocation Database, on that day. EPFR releases country allocations of all funds on the $23^{\text{rd}}$ of each month (or the next available business day) at a monthly frequency. Hence, our calculation assumes constant country allocation between two consecutive release dates within the month.
+
+We then apply the same procedure to all funds with a fund flow and country allocation information and then sum the flows for each currency across all funds.
+
+$$\text{Total Impact}_{c,t} = \sum^{N}_{i=m}{\text{Flow}_i \times \text{Allocation}_i}$$
+Where:
+
+* $\text{Total Impact}$ = the impact on a currency $c$, across all funds $i$, for day $t$
+
+Additionally, we repeat the process across the same fund's Assets held under Management (AuM), to get the total AuM held in a country. 
+
+$$\text{Total AuM}_{c,t} = \sum^{N}_{i=m}{\text{AuM}_i \times \text{Allocation}_i}$$
+
+Where:
+
+* $\text{Total AuM}$ = the assets held in a currency $c$, across all funds $i$, for day $t$
+
+Finally, to find the daily percentage flow into a currency, we divide the Total Impact by the Total AuM. Then we repeat this across all different currencies for the entire history.
+
+$$\text{Percentage Flow}_{c,t} = \frac{\text{Total Impact}_{c,t}}{\text{Total AuM}_{c,t}}$$
+Where:
+
+* $\text{Percentage Flow}$ = the scaled flow as a percentage into a currency $c$, across all funds $i$, for day $t$
+
+---
+
+### Flow File
+
+The users may create flow percentages for their desired FX aggregations and granularity using the methodology described in the previous section. 
+
+EPFR also provides a pre-calculated aggregation for its users for the _FX Strategy_. This file can be found on the FTP under the strategies folder. Please refer to the FTP Folder Structure section for the exact location of this file. This file contains daily flow data for 37 currencies and is updated daily at 5:00 PM est. with a T+1 day lag.
+
+For this demonstration, we use the pre-calculated file. We store this file name/location as below.
+
+```{r}
+flow.file <- "FX-daily.csv" # PATH TO FLOW PERCENTAGE .csv FILE
+```
+
+---
+
+### Return File
+
+The return file for this strategy should contain Exchange rates, which the user can find using their own resources. 
+
+<span style="color: red;">Discuss more...</span>
+
+For this demonstration, we will the file which has been locally named _ExchRates.csv_. 
+
+```{r}
+ret.file <- "ExchRates.csv"
+```
+
+```{r, include=F}
+ret.file <- paste(fcn.dir(), "New Model Concept\\FX\\FloMo\\csv\\ExchRates.csv", sep = "\\")
+```
+

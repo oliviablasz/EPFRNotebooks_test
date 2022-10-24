@@ -1,0 +1,330 @@
+# Flow Percentage Country Strategy
+
+```{r, include=F}
+rm(list = ls())
+library('EPFR')
+library(RCurl)
+library("knitr")
+library("kableExtra")
+library("dplyr")
+library("readr")
+library("tidyr")
+library("forcats")
+library(reshape2)
+library(DT)
+```
+
+The main focus of this proof of concept is to understand the methodology behind the _Flow Percentage Country Strategy_. 
+
+---
+
+## Overview
+
+<!-- <span style="color: red;">Bullet Points might be good here to refer to or expand to be more formal?</span> -->
+
+<!-- * The EPFR Flow Percentage Strategy picks equity markets of countries across the globe.  -->
+<!-- * This approach uses the stated allocations of equity funds with cross-boarder focus.  -->
+<!-- * The strategy developed by EPFR Global is based on percentage flow into countries. -->
+<!-- * Daily percentage flow is compounded over trailing twenty-day period. -->
+<!-- * The top fifth of ACWI countries, in terms of twenty day percentage flows, outperforms the bottom fifth by over 6% per year. -->
+<!-- The strategy works well everywhere, but better in Emerging Markets. -->
+
+This strategy, in particular, is a country rotation strategy, where it chooses different equity markets of countries across the globe. This approach uses the stated allocations of equity funds with a cross-border focus and calculates percentage flow into countries. In terms of twenty-day percentage flows, the top fifth of ACWI countries outperform the bottom fifth by over 6% per year. The strategy works well everywhere but better in Emerging Markets.
+
+<!-- as this strategy is based on percentage flow into countries.  -->
+
+---
+
+## Daily Percentage Flow
+
+The _Flow Percentage Country Strategy_ developed by EPFR Global is based on percentage flow into countries. In this section, the reader will understand what types of aggregations can be used to create a signal for this strategy as well as the methodology behind daily percentage flow calculations. Understanding these fundamentals will further supplement a user's experience working with these data sets as they continue exploring for value and underlying meaning.
+
+---
+
+### Aggregations
+
+<!-- section needs to be cleaned up, not sure if this is right -->
+
+The first step is defining a subset of data to capture in calculating our signal. We use equity funds with a cross-border focus for this strategy.
+
+* Cross-boarder focus: includes global funds, regional funds, Europe regional investing in different countries in Europe, essentially any fund that has a mandate that spans more than one country. 
+
+We exclude the single country-mandated fund flows from this analysis.
+
+The following requirement is that the subset of **funds must all be reporting daily flows and country allocations** since these values are needed to calculate Daily Percentage Flow.
+
+The figure below shows EPFR's coverage over time, which is reported at the end of July each year. As seen below, cross-border funds, which report their country allocations and their fund flows, are a subset of those that only report their fund flows to EPFR.
+
+```{r, echo=FALSE}
+knitr::include_graphics("/Users/blaszkowskio/Dropbox/Quantitative Research/Concept/New Model Concept/Strategy Notebooks/png/coverage_ctryequity.png")
+```
+
+Users looking for more specific detail can customize this aggregation even further using EPFR's fund-level or share class-level granularity. Some good examples would be Active/Passive, ETF or Mutual funds, Institituinal or Retail. Users can use these tags to different degrees in creating aggregated signals to backtest. 
+
+This can be achieved using fund-level flow files or reaching out to EPFR's quant team for customized aggregations.
+
+---
+
+### Calculation
+
+To begin calculating the Daily Percentage flow, we start with our subset of cross-border equity funds. To calculate the fund's impact on a country, we scale a fund's flow by multiplying it against its stated country allocation, which is available in EPFR's Country Allocation Database, on that day. EPFR releases country allocations of all funds on the $23^{\text{rd}}$ of each month (or the next available business day) at a monthly frequency. Hence, our calculation assumes constant country allocation between two consecutive release dates within the month.
+
+We then apply the same procedure to all funds with a fund flow and country allocation information and then sum the flows for each country across all funds.
+
+$$\text{Total Impact}_{c,t} = \sum^{N}_{i=m}{\text{Flow}_i \times \text{Allocation}_i}$$
+Where:
+
+* $\text{Total Impact}$ = the impact on a country $c$, across all funds $i$, for day $t$
+
+Additionally, we repeat the process across the same fund's Assets held under Management (AuM), to get the total AuM held in a country.
+
+$$\text{Total AuM}_{c,t} = \sum^{N}_{i=m}{\text{AuM}_i \times \text{Allocation}_i}$$
+
+Where:
+
+* $\text{Total AuM}$ = the assets held in a country $c$, across all funds $i$, for day $t$
+
+Finally, to find the daily percentage flow for a country, we divide the Total Impact by the Total AuM. Then we repeat this across all different countries for the entire history.
+
+$$\text{Percentage Flow}_{c,t} = \frac{\text{Total Impact}_{c,t}}{\text{Total AuM}_{c,t}}$$
+Where:
+
+* $\text{Percentage Flow}$ = the scaled flow as a percentage into a country $c$, across all funds $i$, for day $t$
+
+---
+
+### Flow File
+
+The users may create flow percentages for their desired country aggregations and granularity using the methodology described in the previous section. 
+
+EPFR also provides a pre-calculated aggregation for its users for the _Daily Flow Percentage Country Strategy_. This file can be found on the FTP under the strategies folder. Please refer to the FTP Folder Structure section for the exact location of this file. This file contains daily flow data for 52 countries and is updated daily at 5:00 PM est. with a T+1 day lag.
+
+For this demonstration, we use the pre-calculated file. We store this file name/location as below.
+
+```{r}
+flow.file <- "FloPctCtry-daily.csv" # PATH TO FLOW PERCENTAGE .csv FILE
+```
+
+```{r, include=F}
+flow.file <- strat.path("FloPctCtry", "daily") # PATH TO FLOW PERCENTAGE .csv FILE
+```
+
+---
+
+### Return File
+
+The return file can be imported by the users using their own resources. EPFR also provides Fund Return data, that can be used as a proxy to returns.
+
+To create a return file using EPFR daily flow data, the following equation can be used:
+
+$$\text{Fund Return}_{c,t} = \frac{\sum^{N}_{i=m} \text{Portfolio Change}_i}{\sum^{N}_{i=m} \text{Assets Start}_i}$$
+Where:
+
+* $\text{Fund Return}$ = the return value of country $c$, across all funds $i$, for day $t$
+
+For this demonstration, we will use files that have calculated returns using EPFR daily flow data, which has been locally named _ETFCountryRetruns.csv_. 
+
+```{r}
+ret.file <- "ETFCountryReturns.csv"
+```
+
+```{r, include=F}
+ret.file <- paste(fcn.dir(), "New Model Concept\\Ctry\\FloMo\\csv\\ETFCountryReturns.csv", sep = "\\")
+```
+
+---
+
+## Strategy Implementation
+
+The final step is to implement this strategy to create a signal. Let's begin by reading in the flow file and return files.
+
+```{r}
+x <- mat.read(flow.file) # GET FLOW PERCENTAGE
+y <- mat.read(ret.file)  # GET RETURN
+```
+
+One of our first options is choosing the universe we want to use. EPFR has tested this signal within three different universes of countries ACWI (All Country World Index), EAFE (Europe, Australasia, and the Far East (EAFE), and EM (Emerging Markets). For this example, we choose **ACWI**, which has about 50 countries.
+
+```{r, include=T}
+idx <- "ACWI"
+```
+
+Then, to subset the flow file $x$ to the selected universe $idx$ the function `Ctry.msci.members.rng()` from the `library('EPFR')` is used. This function returns a list of two letter country codes from $idx$ that are in $x$. 
+
+```{r}
+x <- x[, is.element(dimnames(x)[[2]], Ctry.msci.members.rng(idx, dimnames(x)[[1]][1], dimnames(x)[[1]][dim(x)[1]]))] # SUBSET TO INDEX COUNTRIES
+```
+
+```{r, include=FALSE}
+startdate <- "20150512"
+x <- x[rownames(x)>=startdate, ] # SUBSET TIME PERIOD
+
+ctry <- c('MA', 'JO')
+x <- x[, !(dimnames(x)[[2]] %in% ctry)]
+```
+
+We will also subset the return file $y$ to use the same countries as $x$. 
+
+```{r}
+y <- y[, dimnames(x)[[2]]] # TOTAL RETURN INDEX
+```
+
+```{r, include=FALSE}
+y[is.na(y)] <- 0
+y <- cumprod(1+(y/100)) # calculate cumulative returns
+```
+
+_\* Note: subsetting can be also be done when creating the flow and return files_
+
+### Compounding Flows
+
+Next, we set up a variable for our look-back period, which can also be called a flow window. This variable will be the window of time we use to create a trailing compounded daily percentage flow. The look-back period we choose for our demonstrations is **20 days**.
+
+```{r, include=T}
+lookback <- 20 # FLOW WINDOW (IN WEEKDAYS) - 20 day look back period
+```
+
+Again, using a function from the `library('EPFR')`, `compound.flows()` compounds the daily percentage flow over the trailing `lookback` period for each country. 
+
+```{r}
+x <- compound.flows(x, lookback, 1, F) # COMPOUND FLOWS
+```
+
+### Ranking Countries
+
+Next, we sort the countries in each universe into five equal bins based on their 20-day Percentage Flow Compounded value for the selected holding period. To do this, we will use the function from `library('EPFR')`, called `bbk()`. This function will output a standardized backtest result.
+
+Th `bbk()` function requires our compounded daily percentage flow file, a return file, and our selected universe. Please refer to the library documentation for the complete list of parameters of this function. 
+
+The first parameter we add is the number of bins we want to use. For our case, we want to use 5 because our strategy is to go long the top fifth and short the bottom fifth.
+
+```{r}
+nBin <- 5 # NUMBER OF BINS
+```
+
+Since EPFR data is published with T+1 day lag and is released around 5:00 pm EST, we account for a T+2 day delay in our model since that is when one can trade. Users interested in more timely signals can also use the T+2 Open Prices for backtesting purposes. EPFR also offers a Premium Daily offering, an earlier release of the end-of-day data covering a significant subset of fund-level flow information. 
+
+```{r, include=T}
+delay <- 2 # DELAY IN KNOWING DATA (IN WEEKDAYS) - data takes time to have
+```
+
+It is also important to note that this model will need to be re-balanced weekly. We will set the day of the week to trade as **Friday**.
+
+```{r, include=T}
+doW <- 5 # DAY OF THE WEEK YOU WILL TRADE ON (5 = FRIDAYS)
+```
+
+Additionally, we also evaluate the returns for different holding periods. So we define a return horizon for weekly, fortnightly, monthly, bi-monthly, quarterly, and semi-annually.
+
+```{r, include=T}
+hz <- c(5, 10, 20, 45, 65, 130) # RETURN HORIZON (IN WEEKDAYS) - holding periods
+```
+
+Now that we have defined all of our inputs, to rank the countries into quintiles by their 20-day percentage flow, we call function `bbk()` for a 1-week holding period.
+
+```{r, results=FALSE}
+z <- bbk(x, y, 1, hz[1], nBin, doW, T, 0, delay, idx)
+```
+
+### Model
+
+**Flow percentage compounded over trailing 20 days**
+
+```{r, results=FALSE}
+mat.to.xlModel(z[["raw"]], delay, hz[1], F)
+```
+
+```{r, echo=F}
+datatable(head(mat.to.xlModel(z[["raw"]], delay, hz[1], F))) 
+```
+
+**One-week ahead return (Friday to Friday)**
+
+```{r, results=FALSE}
+mat.to.xlModel(z[["raw.fwd.rets"]], delay, hz[1], F)
+```
+
+```{r, echo=F}
+datatable(head(mat.to.xlModel(z[["raw.fwd.rets"]], delay, hz[1], F))) 
+```
+
+**Twenty-day flow percentage ranked into quintiles (computed only where forward returns are available)**
+
+```{r, results=FALSE}
+mat.to.xlModel(z[["bins"]], delay, hz[1], F)
+```
+
+```{r, echo=F}
+datatable(head(mat.to.xlModel(z[["bins"]], delay, hz[1], F))) 
+```
+
+**Quintile Returns over the equal-weight universe**
+
+```{r, results=FALSE}
+mat.to.xlModel(z[["rets"]], delay, hz[1], F)
+```
+
+```{r, echo=F}
+datatable(head(mat.to.xlModel(z[["rets"]], delay, hz[1], F))) 
+```
+
+---
+
+### Preformance
+
+**Performance over all holding periods**
+
+```{r, results=FALSE}
+fcn <- function(retW) {as.matrix(bbk(x, y, 1, retW, 5, doW, T, 0, delay, idx)$summ)} # DEFINE SUMMARY FUNCTION
+
+mat.ex.array3d(sapply(split(hz, hz), fcn, simplify = "array")) # WRITE SUMMARIES
+```
+
+```{r, echo=F}
+table <- mat.ex.array3d(sapply(split(hz, hz), fcn, simplify = "array"))
+
+table <- as.data.frame(t(as.data.frame(table)))
+table$holding <- gsub( " .*$", "", rownames(table))
+table$header <- sub(".*? ", "", rownames(table))
+
+table$holding <- txt.replace(table$holding, "10", "Fornightly")
+table$holding <- txt.replace(table$holding, "20", "Monthly")
+table$holding <- txt.replace(table$holding, "45", "Bi-Monthly")
+table$holding <- txt.replace(table$holding, "65", "Quarterly")
+table$holding <- txt.replace(table$holding, "130", "Semi-Annual")
+table$holding <- txt.replace(table$holding, "5", "Weekly")
+
+table <- melt(table, id.var = c('holding', 'header'), variable.name = ' ')
+
+summary_tab <- table %>%
+  group_by(holding, header) %>%
+  pivot_wider(names_from = header, values_from = value) %>%
+  mutate(holding = factor(holding)) %>%
+  arrange(holding) %>%
+  select(holding, everything())
+```
+
+```{r, echo=F}
+Fig_2 <- kbl(summary_tab[, -1]) %>%
+  kable_paper("hover", full_width = F) %>%
+  kable_styling(fixed_thead = T) %>%
+  pack_rows(tab_kable, colnum = 1,
+    index = table(fct_inorder(summary_tab$holding), useNA = "no"))
+```
+
+```{r, Fig_2, results='asis', echo=F}
+Fig_2 
+```
+
+---
+
+**Annualized mean one-week returns**
+```{r, results = FALSE}
+bbk(x, y, 1, hz[1], 5, doW, T, 0, delay)$annSumm # DISPLAY CALENDAR-YEAR RETURNS	
+```
+
+```{r, echo=F}
+kbl(bbk(x, y, 1, hz[1], 5, doW, T, 0, delay)$annSumm) %>%
+  kable_paper("hover", full_width = F) %>%
+  kable_styling(fixed_thead = T)
+```

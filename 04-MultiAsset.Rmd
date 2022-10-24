@@ -1,0 +1,363 @@
+# Multi-Asset Strategy
+
+```{r, include=F}
+rm(list = ls())
+library('EPFR')
+library(RCurl)
+library("knitr")
+library("kableExtra")
+library("dplyr")
+library("readr")
+library("tidyr")
+library("forcats")
+library(reshape2)
+library(DT)
+```
+
+The main focus of this proof of concept is to understand the methodology behind the _Multi-Asset Strategy_. 
+
+## Overview 
+<!-- * EPFR’s Multi Asset Strategy is based on percentage flow into asset classes. -->
+<!-- * Daily percentage flow is compounded over a trailing twenty day period.  -->
+<!-- * The top fifth of asset classes, in terms of twenty day percentage flows, outperforms the bottom fifth by 10% per year. -->
+<!-- * The strategy works well whether you consider only equity or fixed income asset classes. -->
+
+<span style="color: red;">This strategy, in particular, is an asset class rotation strategy, where it chooses different equity markets of asset classes. This approach uses active equity funds and calculates percentage flow into asset classes.</span> In terms of twenty-day percentage flows, the top fifth of asset classes outperform the bottom fifth by 10% per year. The strategy works well whether you consider only equity or fixed income asset classes.
+
+---
+
+## Daily Percentage Flow
+
+The _Multi-Asset Strategy_ developed by EPFR Global is based on percentage flow into asset classes. In this section, the reader will understand what types of aggregations can be used to create a signal for this strategy as well as the methodology behind daily percentage flow calculations. Understanding these fundamentals will further supplement a user's experience working with these data sets as they continue exploring for value and underlying meaning.
+
+---
+
+### Aggregations
+
+The first step is defining a subset of data to capture in calculating our signal. We use active equity and/or fixed-income asset classes.
+
+The figure below shows EPFR's coverage over time, which is reported at the end of July each year. As seen below, equity and fixed-income funds (i.e. Multi-Asset), which report daily fund flows, are a subset of those that report their fund flows to EPFR.
+
+```{r, echo=FALSE}
+knitr::include_graphics("/Users/blaszkowskio/Dropbox/Quantitative Research/Concept/New Model Concept/Strategy Notebooks/png/coverage.png")
+```
+
+Users looking for more specific detail can also create their own universe of asset classes. There is the option to customize this aggregation even further using EPFR's fund-level or share class-level granularity. Some good examples would be Active/Passive, ETF or Mutual funds, Institituinal or Retail. Users can use these tags to different degrees in creating aggregated signals to backtest. 
+
+This can be achieved using fund-level flow files or reaching out to EPFR's quant team for customized aggregations.
+
+---
+
+### Calculation
+
+<!-- * We calculate the flow into an asset class as the sum of flows into funds that invest in that asset class. -->
+<!-- * We calculate the assets held in an asset class as the sum of the assets of funds that invest in that asset class. -->
+<!-- * For equity funds, these sums are computed only across active funds. -->
+<!-- * Divide flow into by assets held in an asset class to get daily percentage flow into that asset class. -->
+<!-- * When using both equity and fixed income assets classes (i.e. Multi asset), regress twenty day beta versus MSCI ACWI out of twenty day flow percentage. -->
+
+To begin calculating the Daily Percentage flow, we start with our subset of Multi-Asset funds. To calculate the flow into an asset class, we sum the flows into funds that invest in that asset class. We repeat the process across the same fund's Assets held under Management (AuM), to get the total AuM held in an asset class. Finally, to find the daily percentage flow for an asset class, we divide the flow into by the assets held. Then we repeat this across all different asset classes for the entire history.
+
+$$\text{Percentage Flow}_{c,t} = \frac{\sum^{N}_{i=m} \text{Flow}_{i}}{\sum^{N}_{i=m}{\text{AuM}_{i}}}$$
+Where:
+
+* $\text{Percentage Flow}$ = the scaled flow as a percentage into an asset class $c$, across all funds $i$, for day $t$
+
+---
+
+### Flow File
+
+The users may create flow percentages for their desired Equity and Fixed Income (Multi-Asset) aggregations and granularity using the methodology described in the previous section. 
+
+EPFR also provides a pre-calculated aggregations for its users for the _Multi-Asset Strategy_. These files can be found on the FTP under the strategies folder. Please refer to the FTP Folder Structure section for the exact location of this file. These files contains daily flow data for asset classes listed below and are both updated daily at 5:00 PM est. with a T+1 day lag.
+
+
+<div align="center"> Asset Classes </div>
+
+::: {.columns}
+::: {.column width="50%"}
+
+* 7 Global Equity Regions:
+    - Asia ex Japan
+    - Europe ex UK
+    - Japan
+    - Latin America
+    - Pacific ex Japan
+    - United Kingdom
+    - United States
+
+:::
+::: {.column width="50%"}
+
+* 10 Fixed Income:
+    - Global Emerging Markets
+    - Western Europe Bond
+    - High Yield Bond
+    - Floating Rate Funds
+    - USA Treasuries - 
+    - USA Treasuries - Long
+    - USA Treasuries - Short
+    - Cash
+    - USA Muni's
+    - Global Fixed Income
+
+:::
+:::
+
+For this demonstration, we use the pre-calculated files. We store these file names/locations as below.
+
+```{r}
+flow.file.Rgn <- "MultiAsset-Rgn-daily.csv" # PATH TO FLOW PERCENTAGE .csv FILE
+flow.file.FI <- "MultiAsset-FI-daily.csv" # PATH TO FLOW PERCENTAGE .csv FILE
+
+flow.file <- c(flow.file.Rgn, flow.file.FI)
+```
+
+
+```{r, include=F}
+strats <- c("Rgn", "FI")
+fldrs <- paste(fcn.dir(), "New Model Concept", strats, "FloMo\\csv", sep = "\\")
+
+flow.file <- strat.path(paste("MultiAsset", strats, sep = "-"), "daily")
+```
+---
+
+### Return File
+
+The return files can be imported by the users using their own resources. EPFR also provides Fund Return data, that can be used as a proxy to returns.
+
+To create a return file using EPFR daily flow data, the following equation can be used:
+
+$$\text{Fund Return}_{c,t} = \frac{\sum^{N}_{i=m} \text{Portfolio Change}_i}{\sum^{N}_{i=m} \text{Assets Start}_i}$$
+Where:
+
+* $\text{Fund Return}$ = the return value of an asset class $c$, across all funds $i$, for day $t$
+
+For this demonstration, we will use files that have calculated returns using EPFR daily flow data, which has been locally named _PsuedoReturns-Rgn.csv_ and _PsuedoReturns-FI.csv_. 
+
+```{r}
+ret.file.Rgn <- "PsuedoReturns-Rgn.csv" 
+
+ret.file.FI <- "PsuedoReturns-FI.csv"
+```
+
+```{r, include=F}
+ret.file.Rgn <- paste(fcn.dir(), "New Model Concept\\Strategy Notebooks\\csv", "sql.1dFloMo.Rgn.csv", sep = "\\")
+
+ret.file.FI <- paste(fcn.dir(), "New Model Concept\\Strategy Notebooks\\csv", "sql.1dFloMo.FI.csv", sep = "\\")
+```
+
+
+---
+
+## Strategy Implementation
+
+<!-- * For each asset class, compound daily percentage flow over the trailing twenty days (_lookback_). -->
+<!-- * Rank asset classes into five equal baskets based on twenty day percentage flow. -->
+<!-- * Go long the top fifth and short the bottom fifth. -->
+<!-- * Re-balance weekly. -->
+
+The final step is to implement this strategy to create a signal. Let's begin by using the function `multi.asset()` from `library('EPFR')` to read the flow file. This function simply compiles both data sets together.
+
+```{r}
+x <- multi.asset(flow.file) # GET FLOW PERCENTAGE
+```
+
+One of the first options we have is choosing the universe we want to use. <span style="color: red;">EPFR has tested this signal within two different universes of asset classes Rgn (7 Region Equity), F.I. (Fixed Income), and both together (Multi)</span>. For this example, we choose **Multi**, which has about 17 asset classes.
+
+```{r, include=T}
+idx <- "Multi" # Multi/Rgn/FI
+```
+
+
+### Compounding Flows
+
+Next, we set up a variable for our look-back period, which can also be called a flow window. This variable will be the window of time we use to create a trailing compounded daily percentage flow. The look-back period we choose for our demonstrations is **20 days**.
+
+```{r, include=T}
+lookback <- 20 # FLOW WINDOW (IN WEEKDAYS) - 20 day look back period
+```
+
+Again, using a function from the `library('EPFR')`, `compound.flows()` compounds the daily percentage flow over the trailing `lookback` period for each country. 
+
+```{r}
+x <- compound.flows(x, lookback, 1, F) # COMPOUND FLOWS
+```
+
+### Return file
+
+We will then import our two total return files and modify them to be one data frame of total index returns indexed so that time moves forward. To do this we will use function `ret.to.idx()` from `library('EPFR')` which will translate these returns to a total return index. We also use the functions `map.rname()` to ensure the row names of the matrices line up with our flow file and `ret.idx.gaps.fix()` to replace any NA values.
+
+```{r, results = FALSE}
+#RGN RETURNS
+y <- mat.read(ret.file.Rgn)
+y <- ret.to.idx(map.rname(y, dimnames(x)[[1]])) # CONVERT TO A TOTAL-RETURN INDEX			
+y <- ret.idx.gaps.fix(y)
+
+#F.I. RETURNS
+z <- mat.read(ret.file.FI)
+z <- ret.to.idx(map.rname(z, dimnames(y)[[1]])) # CONVERT TO A TOTAL-RETURN INDEX			
+
+#COMBINE RETURN FILES
+y <- data.frame(y, z)[, dimnames(x)[[2]]] # FINAL TOTAL-RETURN INDEX TABLE			
+y <- y[max(simplify2array(lapply(y, function(x) {find.data(!is.na(x), T)}))):min(simplify2array(lapply(y, function(x) {find.data(!is.na(x), F)}))), ] # ENSURE ALL PIECES HAVE RETURN OVER THE SAME HORIZON			
+```
+
+Then, to subset the flow file $x$ and return file $y$ to the selected universe $idx$ of asset classes, the function the following code is used.
+
+```{r}
+if (idx == "Rgn") {	
+	x <- x[, 1:7]
+	y <- y[, 1:7]
+} else if (idx == "FI") {	
+	x <- x[, 8:dim(x)[2]]
+	y <- y[, 8:dim(y)[2]]
+} else {	
+	z <- map.rname(portfolio.beta.wrapper(y, "ACWorld", lookback), dimnames(x)[[1]])
+	for (j in 1:dim(x)[1]) x[j, ] <- portfolio.residual(unlist(x[j, ]), unlist(z[j, ]))
+}	
+```
+
+_\* Note: subsetting can be also be done when creating the flow and return files_
+
+### Ranking Asset Classes
+
+Next, we sort the countries in each universe into five equal bins based on their 20-day Percentage Flow Compounded value for the selected holding period. To do this, we will use the function from `library('EPFR')`, called `bbk()`. This function will output a standardized backtest result.
+
+Th `bbk()` function requires our compounded daily percentage flow file, a return file, and our selected universe. Please refer to the library documentation for the complete list of parameters of this function. 
+
+The first parameter we add is the number of bins we want to use. For our case, we want to use 5 because our strategy is to go long the top fifth and short the bottom fifth.
+
+
+```{r}
+nBin <- 5 # NUMBER OF BINS
+```
+
+Since EPFR data is published with T+1 day lag and is released around 5:00 pm EST, we account for a T+2 day delay in our model since that is when one can trade. Users interested in more timely signals can also use the T+2 Open Prices for backtesting purposes. EPFR also offers a Premium Daily offering, an earlier release of the end-of-day data covering a significant subset of fund-level flow information. 
+
+```{r, include=T}
+delay <- 2 # DELAY IN KNOWING DATA (IN WEEKDAYS) - data takes time to have
+```
+
+It is also important to note that this model will need to be re-balanced weekly. We will set the day of the week to trade as **Friday**.
+
+```{r, include=T}
+doW <- 5 # DAY OF THE WEEK YOU WILL TRADE ON (5 = FRIDAYS)
+```
+
+Additionally, we also evaluate the returns for different holding periods. So we define a return horizon for weekly, fortnightly, monthly, bi-monthly, quarterly, and semi-annually.
+
+```{r, include=T}
+hz <- c(5, 10, 20, 45, 65, 130) # RETURN HORIZON (IN WEEKDAYS) - holding periods
+```
+
+Now that we have defined all of our inputs, to rank the countries into quintiles by their 20-day percentage flow, we call function `bbk()` for a 1-week holding period.
+
+```{r, results=FALSE}
+z <- bbk(x, y, 1, hz[1], nBin, doW, T, 0, delay)
+```
+
+### Model
+
+**Flow percentage compounded over trailing 20 days**
+
+```{r, results=FALSE}
+mat.to.xlModel(z[["raw"]], delay, hz[1], F)
+```
+
+```{r, echo=F}
+datatable(head(mat.to.xlModel(z[["raw"]], delay, hz[1], F))) 
+```
+
+**One-week ahead return (Friday to Friday)**
+
+```{r, results=FALSE}
+mat.to.xlModel(z[["raw.fwd.rets"]], delay, hz[1], F)
+```
+
+```{r, echo=F}
+datatable(head(mat.to.xlModel(z[["raw.fwd.rets"]], delay, hz[1], F))) 
+```
+
+**Twenty-day flow percentage ranked into quintiles (computed only where forward returns are available)**
+
+```{r, results=FALSE}
+mat.to.xlModel(z[["bins"]], delay, hz[1], F)
+```
+
+```{r, echo=F}
+datatable(head(mat.to.xlModel(z[["bins"]], delay, hz[1], F))) 
+```
+
+**Quintile Returns over the equal-weight universe**
+
+```{r, results=FALSE}
+mat.to.xlModel(z[["rets"]], delay, hz[1], F)
+```
+
+```{r, echo=F}
+datatable(head(mat.to.xlModel(z[["rets"]], delay, hz[1], F))) 
+```
+
+---
+
+### Preformance
+
+**Performance over all holding periods**
+
+```{r, results=FALSE}
+fcn <- function(retW) {as.matrix(bbk(x, y, 1, retW, 5, doW, T, 0, delay)$summ)} # DEFINE SUMMARY FUNCTION
+
+mat.ex.array3d(sapply(split(hz, hz), fcn, simplify = "array")) # WRITE SUMMARIES
+```
+
+```{r, echo=F}
+table <- mat.ex.array3d(sapply(split(hz, hz), fcn, simplify = "array"))
+
+table <- as.data.frame(t(as.data.frame(table)))
+table$holding <- gsub( " .*$", "", rownames(table))
+table$header <- sub(".*? ", "", rownames(table))
+
+table$holding <- txt.replace(table$holding, "10", "Fornightly")
+table$holding <- txt.replace(table$holding, "20", "Monthly")
+table$holding <- txt.replace(table$holding, "45", "Bi-Monthly")
+table$holding <- txt.replace(table$holding, "65", "Quarterly")
+table$holding <- txt.replace(table$holding, "130", "Semi-Annual")
+table$holding <- txt.replace(table$holding, "5", "Weekly")
+
+table <- melt(table, id.var = c('holding', 'header'), variable.name = ' ')
+
+summary_tab <- table %>%
+  group_by(holding, header) %>%
+  pivot_wider(names_from = header, values_from = value) %>%
+  mutate(holding = factor(holding)) %>%
+  arrange(holding) %>%
+  select(holding, everything())
+```
+
+```{r, echo=F}
+Fig_Multi <- kbl(summary_tab[, -1]) %>%
+  kable_paper("hover", full_width = F) %>%
+  kable_styling(fixed_thead = T) %>%
+  pack_rows(tab_kable, colnum = 1,
+    index = table(fct_inorder(summary_tab$holding), useNA = "no"))
+```
+
+```{r, Fig_Multi, results='asis', echo=F}
+Fig_Multi
+```
+
+---
+
+**Annualized mean one-week returns**
+```{r, results = FALSE}
+bbk(x, y, 1, hz[1], 5, doW, T, 0, delay)$annSumm # DISPLAY CALENDAR-YEAR RETURNS
+```
+
+```{r, echo=F}
+kbl(bbk(x, y, 1, hz[1], 5, doW, T, 0, delay)$annSumm) %>%
+  kable_paper("hover", full_width = F) %>%
+  kable_styling(fixed_thead = T)
+```
+
+

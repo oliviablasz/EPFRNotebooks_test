@@ -1,0 +1,9 @@
+# EPFR Library
+
+The EPFR Library has an extensive list of applicable functions for use on our data and will be used in this demonstration of our strategies. 
+
+To install the library `EPFR`, [click here](https://github.com/vsrimurthy/EPFR) to download zip from github.
+
+```{r,warning=FALSE,message=FALSE}
+library('EPFR')
+```
