@@ -1,0 +1,25 @@
+--- 
+title: "EPFR Notebooks"
+author: "Olivia Blaszkowski"
+date: "`r Sys.Date()`"
+site: bookdown::bookdown_site
+documentclass: book
+# bibliography: [book.bib, packages.bib]
+# url: your book url like https://bookdown.org/yihui/bookdown
+# cover-image: /Users/blaszkowskio/Dropbox/Quantitative Research/Concept/New Model Concept/Strategy Notebooks/png/logo.png
+description: |
+  This is a minimal example of using the bookdown package to write a book.
+  The HTML output format for this example is bookdown::gitbook,
+  set in the _output.yml file.
+link-citations: yes
+github-repo: oliviablasz/EPFRNotebooks_v2
+---
+
+# Introduction
+
+The objective of this book is to present EPFR's proof of concept strategies so that readers have a profound understanding of how to use our EPFR's flow and allocation dataset, construct a signal, and find initial value.
+
+This book has nine proof-of-concept strategies created by Quantitative Analysts at EPFR. The backtesting methodology across each of these is relatively similar. They are quintile based, long/short, and we apply similar lookback periods for our backtests. This is because we do not tend to optimize any of these strategies since our goal is simply for the reader to construct a signal from EPFR's data and realize the value. The theory is that from these examples the reader will be able to build upon these models or create their own for more optimized results in the future.
+
+For this type of testing on our data, we provide the time series file available for download. <span style="color: red;">(add an interactive field i.e. request to download, email sales, or download options)</span>
+
